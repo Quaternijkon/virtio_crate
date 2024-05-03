@@ -692,6 +692,9 @@ pub(crate) struct Descriptor {
     next: u16,
 }
 
+unsafe impl Send for Descriptor {}
+unsafe impl Sync for Descriptor {}
+
 impl Descriptor {
     /// Sets the buffer address, length and flags, and shares it with the device.
     ///
