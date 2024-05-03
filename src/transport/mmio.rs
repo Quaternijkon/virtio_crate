@@ -273,6 +273,9 @@ impl VirtIOHeader {
 /// MMIO Device Register Interface.
 ///
 /// Ref: 4.2.2 MMIO Device Register Layout and 4.2.4 Legacy interface
+//实现send，sync特征
+unsafe impl Send for MmioTransport {}
+unsafe impl Sync for MmioTransport {}
 #[derive(Debug)]
 pub struct MmioTransport {
     header: NonNull<VirtIOHeader>,
