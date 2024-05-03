@@ -683,6 +683,9 @@ fn queue_part_sizes(queue_size: u16) -> (usize, usize, usize) {
     (desc, avail, used)
 }
 
+unsafe impl Send for Descriptor {}
+unsafe impl Sync for Descriptor {}
+
 #[repr(C, align(16))]
 #[derive(AsBytes, Clone, Debug, FromBytes, FromZeroes)]
 pub(crate) struct Descriptor {
@@ -691,9 +694,6 @@ pub(crate) struct Descriptor {
     flags: DescFlags,
     next: u16,
 }
-
-unsafe impl Send for Descriptor {}
-unsafe impl Sync for Descriptor {}
 
 impl Descriptor {
     /// Sets the buffer address, length and flags, and shares it with the device.
