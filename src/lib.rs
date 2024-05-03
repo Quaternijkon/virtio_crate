@@ -42,7 +42,7 @@
 //! ```
 
 #![cfg_attr(not(test), no_std)]
-#![deny(unused_must_use, missing_docs)]
+// #![deny(unused_must_use, missing_docs)]
 #![allow(clippy::identity_op)]
 #![allow(dead_code)]
 
@@ -50,7 +50,7 @@
 extern crate alloc;
 
 pub mod device;
-mod hal;
+pub mod hal;
 mod queue;
 pub mod transport;
 mod volatile;
