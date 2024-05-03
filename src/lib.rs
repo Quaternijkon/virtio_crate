@@ -51,6 +51,7 @@ extern crate alloc;
 
 pub mod device;
 pub mod hal;
+pub mod halimpl;
 mod queue;
 pub mod transport;
 mod volatile;

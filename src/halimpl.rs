@@ -4,6 +4,7 @@
 
 use crate::{BufferDirection, Hal, PhysAddr, PAGE_SIZE};
 use alloc::alloc::{alloc_zeroed, dealloc, handle_alloc_error};
+use alloc::boxed::Box;
 use core::{
     alloc::Layout,
     ptr::{self, NonNull},
