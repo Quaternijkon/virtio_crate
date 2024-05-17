@@ -276,7 +276,7 @@ impl VirtIOHeader {
 //实现send，sync特征
 unsafe impl Send for MmioTransport {}
 unsafe impl Sync for MmioTransport {}
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MmioTransport {
     header: NonNull<VirtIOHeader>,
     version: MmioVersion,
