@@ -316,6 +316,8 @@ impl<H: Hal, T: Transport> VirtIOBlk<H, T> {
     /// }
     /// # Ok(())
     /// # }
+    ///
+    ///
     /// ```
     ///
     /// # Safety
@@ -811,457 +813,642 @@ mod tests {
     };
     use alloc::{sync::Arc, vec};
     use core::{mem::size_of, ptr::NonNull};
+    use std::time::Instant;
     use std::{sync::Mutex, thread};
 
     #[test]
     fn config() {
-        let mut config_space = BlkConfig {
-            capacity_low: Volatile::new(0x42),
-            capacity_high: Volatile::new(0x02),
-            size_max: Volatile::new(0),
-            seg_max: Volatile::new(0),
-            geometry: BlkGeometry {
-                cylinders: Volatile::new(0),
-                heads: Volatile::new(0),
-                sectors: Volatile::new(0),
-            },
-            blk_size: Volatile::new(0),
-            topology: BlkTopology {
-                physical_block_size: Volatile::new(0),
-                alignment_offset: Volatile::new(0),
-                min_io_size: Volatile::new(0),
-                opt_io_size: Volatile::new(0),
-            },
-            writeback: Volatile::new(0),
-            unused0: Volatile::new(0),
-            num_queues: Volatile::new(0),
-            max_discard_sectors: Volatile::new(0),
-            max_discard_seg: Volatile::new(0),
-            discard_sector_alignment: Volatile::new(0),
-            max_write_zeroes_sectors: Volatile::new(0),
-            max_write_zeroes_seg: Volatile::new(0),
-            write_zeroes_may_unmap: Volatile::new(0),
-            unused1: [Volatile::new(0); 3],
-            max_secure_erase_sectors: Volatile::new(0),
-            max_secure_erase_seg: Volatile::new(0),
-            secure_erase_sector_alignment: Volatile::new(0),
-            zoned: BlkZonedCharacteristics {
-                zone_sectors: Volatile::new(0),
-                max_open_zones: Volatile::new(0),
-                max_active_zones: Volatile::new(0),
-                max_append_sectors: Volatile::new(0),
-                write_granularity: Volatile::new(0),
-                model: ModelType::NONE,
-                unused2: [Volatile::new(0); 3],
-            },
-        };
-        let state = Arc::new(Mutex::new(State {
-            queues: vec![QueueStatus::default()],
-            ..Default::default()
-        }));
-        let transport = FakeTransport {
-            device_type: DeviceType::Block,
-            max_queue_size: QUEUE_SIZE.into(),
-            device_features: BlkFeature::RO.bits(),
-            config_space: NonNull::from(&mut config_space),
-            state: state.clone(),
-        };
-        let blk = VirtIOBlk::<FakeHal, FakeTransport<BlkConfig>>::new(transport).unwrap();
+        const NUM_REQUESTS: usize = 1000; // 执行的请求数量
 
-        assert_eq!(blk.capacity(), 0x02_0000_0042);
-        assert_eq!(blk.readonly(), true);
+        let mut total_execution_time = 0;
+
+        for _ in 0..NUM_REQUESTS {
+            let start_time = Instant::now(); // 记录开始时间
+            let mut config_space = BlkConfig {
+                capacity_low: Volatile::new(0x42),
+                capacity_high: Volatile::new(0x02),
+                size_max: Volatile::new(0),
+                seg_max: Volatile::new(0),
+                geometry: BlkGeometry {
+                    cylinders: Volatile::new(0),
+                    heads: Volatile::new(0),
+                    sectors: Volatile::new(0),
+                },
+                blk_size: Volatile::new(0),
+                topology: BlkTopology {
+                    physical_block_size: Volatile::new(0),
+                    alignment_offset: Volatile::new(0),
+                    min_io_size: Volatile::new(0),
+                    opt_io_size: Volatile::new(0),
+                },
+                writeback: Volatile::new(0),
+                unused0: Volatile::new(0),
+                num_queues: Volatile::new(0),
+                max_discard_sectors: Volatile::new(0),
+                max_discard_seg: Volatile::new(0),
+                discard_sector_alignment: Volatile::new(0),
+                max_write_zeroes_sectors: Volatile::new(0),
+                max_write_zeroes_seg: Volatile::new(0),
+                write_zeroes_may_unmap: Volatile::new(0),
+                unused1: [Volatile::new(0); 3],
+                max_secure_erase_sectors: Volatile::new(0),
+                max_secure_erase_seg: Volatile::new(0),
+                secure_erase_sector_alignment: Volatile::new(0),
+                zoned: BlkZonedCharacteristics {
+                    zone_sectors: Volatile::new(0),
+                    max_open_zones: Volatile::new(0),
+                    max_active_zones: Volatile::new(0),
+                    max_append_sectors: Volatile::new(0),
+                    write_granularity: Volatile::new(0),
+                    model: ModelType::NONE,
+                    unused2: [Volatile::new(0); 3],
+                },
+            };
+            let state = Arc::new(Mutex::new(State {
+                queues: vec![QueueStatus::default()],
+                ..Default::default()
+            }));
+            let transport = FakeTransport {
+                device_type: DeviceType::Block,
+                max_queue_size: QUEUE_SIZE.into(),
+                device_features: BlkFeature::RO.bits(),
+                config_space: NonNull::from(&mut config_space),
+                state: state.clone(),
+            };
+            let blk = VirtIOBlk::<FakeHal, FakeTransport<BlkConfig>>::new(transport).unwrap();
+
+            assert_eq!(blk.capacity(), 0x02_0000_0042);
+            assert_eq!(blk.readonly(), true);
+
+            let execution_time = start_time.elapsed().as_micros(); // 计算执行时间
+            total_execution_time += execution_time;
+        }
+        let average_execution_time = total_execution_time as f64 / NUM_REQUESTS as f64;
+        println!(
+            "Average execution time per request: {} microseconds",
+            average_execution_time
+        );
     }
 
     #[test]
     fn read() {
-        let mut config_space = BlkConfig {
-            capacity_low: Volatile::new(66),
-            capacity_high: Volatile::new(0),
-            size_max: Volatile::new(0),
-            seg_max: Volatile::new(0),
-            geometry: BlkGeometry {
-                cylinders: Volatile::new(0),
-                heads: Volatile::new(0),
-                sectors: Volatile::new(0),
-            },
-            blk_size: Volatile::new(0),
-            topology: BlkTopology {
-                physical_block_size: Volatile::new(0),
-                alignment_offset: Volatile::new(0),
-                min_io_size: Volatile::new(0),
-                opt_io_size: Volatile::new(0),
-            },
-            writeback: Volatile::new(0),
-            unused0: Volatile::new(0),
-            num_queues: Volatile::new(0),
-            max_discard_sectors: Volatile::new(0),
-            max_discard_seg: Volatile::new(0),
-            discard_sector_alignment: Volatile::new(0),
-            max_write_zeroes_sectors: Volatile::new(0),
-            max_write_zeroes_seg: Volatile::new(0),
-            write_zeroes_may_unmap: Volatile::new(0),
-            unused1: [Volatile::new(0); 3],
-            max_secure_erase_sectors: Volatile::new(0),
-            max_secure_erase_seg: Volatile::new(0),
-            secure_erase_sector_alignment: Volatile::new(0),
-            zoned: BlkZonedCharacteristics {
-                zone_sectors: Volatile::new(0),
-                max_open_zones: Volatile::new(0),
-                max_active_zones: Volatile::new(0),
-                max_append_sectors: Volatile::new(0),
-                write_granularity: Volatile::new(0),
-                model: ModelType::NONE,
-                unused2: [Volatile::new(0); 3],
-            },
-        };
-        let state = Arc::new(Mutex::new(State {
-            queues: vec![QueueStatus::default()],
-            ..Default::default()
-        }));
-        let transport = FakeTransport {
-            device_type: DeviceType::Block,
-            max_queue_size: QUEUE_SIZE.into(),
-            device_features: BlkFeature::RING_INDIRECT_DESC.bits(),
-            config_space: NonNull::from(&mut config_space),
-            state: state.clone(),
-        };
-        let mut blk = VirtIOBlk::<FakeHal, FakeTransport<BlkConfig>>::new(transport).unwrap();
+        const NUM_REQUESTS: usize = 1000; // 执行的请求数量
 
-        // Start a thread to simulate the device waiting for a read request.
-        let handle = thread::spawn(move || {
-            println!("Device waiting for a request.");
-            State::wait_until_queue_notified(&state, QUEUE);
-            println!("Transmit queue was notified.");
+        let mut total_execution_time = 0;
 
-            state
-                .lock()
-                .unwrap()
-                .read_write_queue::<{ QUEUE_SIZE as usize }>(QUEUE, |request| {
-                    assert_eq!(
-                        request,
-                        BlkReq {
-                            type_: ReqType::In,
-                            reserved: 0,
-                            sector: 42,
-                            // data: [0; 16],
-                            // status: StatusType::OK,
-                        }
-                        .as_bytes()
-                    );
+        for _ in 0..NUM_REQUESTS {
+            let start_time = Instant::now();
+            let mut config_space = BlkConfig {
+                capacity_low: Volatile::new(66),
+                capacity_high: Volatile::new(0),
+                size_max: Volatile::new(0),
+                seg_max: Volatile::new(0),
+                geometry: BlkGeometry {
+                    cylinders: Volatile::new(0),
+                    heads: Volatile::new(0),
+                    sectors: Volatile::new(0),
+                },
+                blk_size: Volatile::new(0),
+                topology: BlkTopology {
+                    physical_block_size: Volatile::new(0),
+                    alignment_offset: Volatile::new(0),
+                    min_io_size: Volatile::new(0),
+                    opt_io_size: Volatile::new(0),
+                },
+                writeback: Volatile::new(0),
+                unused0: Volatile::new(0),
+                num_queues: Volatile::new(0),
+                max_discard_sectors: Volatile::new(0),
+                max_discard_seg: Volatile::new(0),
+                discard_sector_alignment: Volatile::new(0),
+                max_write_zeroes_sectors: Volatile::new(0),
+                max_write_zeroes_seg: Volatile::new(0),
+                write_zeroes_may_unmap: Volatile::new(0),
+                unused1: [Volatile::new(0); 3],
+                max_secure_erase_sectors: Volatile::new(0),
+                max_secure_erase_seg: Volatile::new(0),
+                secure_erase_sector_alignment: Volatile::new(0),
+                zoned: BlkZonedCharacteristics {
+                    zone_sectors: Volatile::new(0),
+                    max_open_zones: Volatile::new(0),
+                    max_active_zones: Volatile::new(0),
+                    max_append_sectors: Volatile::new(0),
+                    write_granularity: Volatile::new(0),
+                    model: ModelType::NONE,
+                    unused2: [Volatile::new(0); 3],
+                },
+            };
+            let state = Arc::new(Mutex::new(State {
+                queues: vec![QueueStatus::default()],
+                ..Default::default()
+            }));
+            let transport = FakeTransport {
+                device_type: DeviceType::Block,
+                max_queue_size: QUEUE_SIZE.into(),
+                device_features: BlkFeature::RING_INDIRECT_DESC.bits(),
+                config_space: NonNull::from(&mut config_space),
+                state: state.clone(),
+            };
+            let mut blk = VirtIOBlk::<FakeHal, FakeTransport<BlkConfig>>::new(transport).unwrap();
+            // Start a thread to simulate the device waiting for a read request.
+            let handle = thread::spawn(move || {
+                println!("Device waiting for a request.");
+                State::wait_until_queue_notified(&state, QUEUE);
+                println!("Transmit queue was notified.");
 
-                    let mut response = vec![0; SECTOR_SIZE];
-                    response[0..9].copy_from_slice(b"Test data");
-                    response.extend_from_slice(
-                        BlkResp {
-                            status: RespStatus::OK,
-                        }
-                        .as_bytes(),
-                    );
+                state
+                    .lock()
+                    .unwrap()
+                    .read_write_queue::<{ QUEUE_SIZE as usize }>(QUEUE, |request| {
+                        assert_eq!(
+                            request,
+                            BlkReq {
+                                type_: ReqType::In,
+                                reserved: 0,
+                                sector: 42,
+                                // data: [0; 16],
+                                // status: StatusType::OK,
+                            }
+                            .as_bytes()
+                        );
 
-                    response
-                });
-        });
+                        let mut response = vec![0; SECTOR_SIZE];
+                        response[0..9].copy_from_slice(b"Test data");
+                        response.extend_from_slice(
+                            BlkResp {
+                                status: RespStatus::OK,
+                            }
+                            .as_bytes(),
+                        );
 
-        // Read a block from the device.
-        let mut buffer = [0; 512];
-        blk.read_blocks(42, &mut buffer).unwrap();
-        assert_eq!(&buffer[0..9], b"Test data");
+                        response
+                    });
+            });
 
-        handle.join().unwrap();
+            // Read a block from the device.
+            let mut buffer = [0; 512];
+            blk.read_blocks(42, &mut buffer).unwrap();
+            assert_eq!(&buffer[0..9], b"Test data");
+
+            handle.join().unwrap();
+            let execution_time = start_time.elapsed().as_micros(); // 计算执行时间
+            total_execution_time += execution_time;
+        }
+        let average_execution_time = total_execution_time as f64 / NUM_REQUESTS as f64;
+        println!(
+            "Average execution time per request: {} microseconds",
+            average_execution_time
+        );
     }
 
     #[test]
     fn write() {
-        let mut config_space = BlkConfig {
-            capacity_low: Volatile::new(66),
-            capacity_high: Volatile::new(0),
-            size_max: Volatile::new(0),
-            seg_max: Volatile::new(0),
-            geometry: BlkGeometry {
-                cylinders: Volatile::new(0),
-                heads: Volatile::new(0),
-                sectors: Volatile::new(0),
-            },
-            blk_size: Volatile::new(0),
-            topology: BlkTopology {
-                physical_block_size: Volatile::new(0),
-                alignment_offset: Volatile::new(0),
-                min_io_size: Volatile::new(0),
-                opt_io_size: Volatile::new(0),
-            },
-            writeback: Volatile::new(0),
-            unused0: Volatile::new(0),
-            num_queues: Volatile::new(0),
-            max_discard_sectors: Volatile::new(0),
-            max_discard_seg: Volatile::new(0),
-            discard_sector_alignment: Volatile::new(0),
-            max_write_zeroes_sectors: Volatile::new(0),
-            max_write_zeroes_seg: Volatile::new(0),
-            write_zeroes_may_unmap: Volatile::new(0),
-            unused1: [Volatile::new(0); 3],
-            max_secure_erase_sectors: Volatile::new(0),
-            max_secure_erase_seg: Volatile::new(0),
-            secure_erase_sector_alignment: Volatile::new(0),
-            zoned: BlkZonedCharacteristics {
-                zone_sectors: Volatile::new(0),
-                max_open_zones: Volatile::new(0),
-                max_active_zones: Volatile::new(0),
-                max_append_sectors: Volatile::new(0),
-                write_granularity: Volatile::new(0),
-                model: ModelType::NONE,
-                unused2: [Volatile::new(0); 3],
-            },
-        };
-        let state = Arc::new(Mutex::new(State {
-            queues: vec![QueueStatus::default()],
-            ..Default::default()
-        }));
-        let transport = FakeTransport {
-            device_type: DeviceType::Block,
-            max_queue_size: QUEUE_SIZE.into(),
-            device_features: BlkFeature::RING_INDIRECT_DESC.bits(),
-            config_space: NonNull::from(&mut config_space),
-            state: state.clone(),
-        };
-        let mut blk = VirtIOBlk::<FakeHal, FakeTransport<BlkConfig>>::new(transport).unwrap();
+        const NUM_REQUESTS: usize = 1000; // 执行的请求数量
 
-        // Start a thread to simulate the device waiting for a write request.
-        let handle = thread::spawn(move || {
-            println!("Device waiting for a request.");
-            State::wait_until_queue_notified(&state, QUEUE);
-            println!("Transmit queue was notified.");
+        let mut total_execution_time = 0;
+        for _ in 0..NUM_REQUESTS {
+            let start_time = Instant::now(); // 记录开始时间
+            let mut config_space = BlkConfig {
+                capacity_low: Volatile::new(66),
+                capacity_high: Volatile::new(0),
+                size_max: Volatile::new(0),
+                seg_max: Volatile::new(0),
+                geometry: BlkGeometry {
+                    cylinders: Volatile::new(0),
+                    heads: Volatile::new(0),
+                    sectors: Volatile::new(0),
+                },
+                blk_size: Volatile::new(0),
+                topology: BlkTopology {
+                    physical_block_size: Volatile::new(0),
+                    alignment_offset: Volatile::new(0),
+                    min_io_size: Volatile::new(0),
+                    opt_io_size: Volatile::new(0),
+                },
+                writeback: Volatile::new(0),
+                unused0: Volatile::new(0),
+                num_queues: Volatile::new(0),
+                max_discard_sectors: Volatile::new(0),
+                max_discard_seg: Volatile::new(0),
+                discard_sector_alignment: Volatile::new(0),
+                max_write_zeroes_sectors: Volatile::new(0),
+                max_write_zeroes_seg: Volatile::new(0),
+                write_zeroes_may_unmap: Volatile::new(0),
+                unused1: [Volatile::new(0); 3],
+                max_secure_erase_sectors: Volatile::new(0),
+                max_secure_erase_seg: Volatile::new(0),
+                secure_erase_sector_alignment: Volatile::new(0),
+                zoned: BlkZonedCharacteristics {
+                    zone_sectors: Volatile::new(0),
+                    max_open_zones: Volatile::new(0),
+                    max_active_zones: Volatile::new(0),
+                    max_append_sectors: Volatile::new(0),
+                    write_granularity: Volatile::new(0),
+                    model: ModelType::NONE,
+                    unused2: [Volatile::new(0); 3],
+                },
+            };
+            let state = Arc::new(Mutex::new(State {
+                queues: vec![QueueStatus::default()],
+                ..Default::default()
+            }));
+            let transport = FakeTransport {
+                device_type: DeviceType::Block,
+                max_queue_size: QUEUE_SIZE.into(),
+                device_features: BlkFeature::RING_INDIRECT_DESC.bits(),
+                config_space: NonNull::from(&mut config_space),
+                state: state.clone(),
+            };
+            let mut blk = VirtIOBlk::<FakeHal, FakeTransport<BlkConfig>>::new(transport).unwrap();
 
-            state
-                .lock()
-                .unwrap()
-                .read_write_queue::<{ QUEUE_SIZE as usize }>(QUEUE, |request| {
-                    assert_eq!(
-                        &request[0..size_of::<BlkReq>()],
-                        BlkReq {
-                            type_: ReqType::Out,
-                            reserved: 0,
-                            sector: 42,
-                            // data: [0; 16],
-                            // status: StatusType::OK,
-                        }
-                        .as_bytes()
-                    );
-                    let data = &request[size_of::<BlkReq>()..];
-                    assert_eq!(data.len(), SECTOR_SIZE);
-                    assert_eq!(&data[0..9], b"Test data");
+            // Start a thread to simulate the device waiting for a write request.
+            let handle = thread::spawn(move || {
+                println!("Device waiting for a request.");
+                State::wait_until_queue_notified(&state, QUEUE);
+                println!("Transmit queue was notified.");
 
-                    let mut response = Vec::new();
-                    response.extend_from_slice(
-                        BlkResp {
-                            status: RespStatus::OK,
-                        }
-                        .as_bytes(),
-                    );
+                state
+                    .lock()
+                    .unwrap()
+                    .read_write_queue::<{ QUEUE_SIZE as usize }>(QUEUE, |request| {
+                        assert_eq!(
+                            &request[0..size_of::<BlkReq>()],
+                            BlkReq {
+                                type_: ReqType::Out,
+                                reserved: 0,
+                                sector: 42,
+                                // data: [0; 16],
+                                // status: StatusType::OK,
+                            }
+                            .as_bytes()
+                        );
+                        let data = &request[size_of::<BlkReq>()..];
+                        assert_eq!(data.len(), SECTOR_SIZE);
+                        assert_eq!(&data[0..9], b"Test data");
 
-                    response
-                });
-        });
+                        let mut response = Vec::new();
+                        response.extend_from_slice(
+                            BlkResp {
+                                status: RespStatus::OK,
+                            }
+                            .as_bytes(),
+                        );
 
-        // Write a block to the device.
-        let mut buffer = [0; 512];
-        buffer[0..9].copy_from_slice(b"Test data");
-        blk.write_blocks(42, &mut buffer).unwrap();
+                        response
+                    });
+            });
 
-        // Request to flush should be ignored as the device doesn't support it.
-        blk.flush().unwrap();
+            // Write a block to the device.
+            let mut buffer = [0; 512];
+            buffer[0..9].copy_from_slice(b"Test data");
+            blk.write_blocks(42, &mut buffer).unwrap();
 
-        handle.join().unwrap();
+            // Request to flush should be ignored as the device doesn't support it.
+            blk.flush().unwrap();
+
+            handle.join().unwrap();
+            let execution_time = start_time.elapsed().as_micros(); // 计算执行时间
+            total_execution_time += execution_time;
+        }
+        let average_execution_time = total_execution_time as f64 / NUM_REQUESTS as f64;
+        println!(
+            "Average execution time per request: {} microseconds",
+            average_execution_time
+        );
     }
 
     #[test]
     fn flush() {
-        let mut config_space = BlkConfig {
-            capacity_low: Volatile::new(66),
-            capacity_high: Volatile::new(0),
-            size_max: Volatile::new(0),
-            seg_max: Volatile::new(0),
-            geometry: BlkGeometry {
-                cylinders: Volatile::new(0),
-                heads: Volatile::new(0),
-                sectors: Volatile::new(0),
-            },
-            blk_size: Volatile::new(0),
-            topology: BlkTopology {
-                physical_block_size: Volatile::new(0),
-                alignment_offset: Volatile::new(0),
-                min_io_size: Volatile::new(0),
-                opt_io_size: Volatile::new(0),
-            },
-            writeback: Volatile::new(0),
-            unused0: Volatile::new(0),
-            num_queues: Volatile::new(0),
-            max_discard_sectors: Volatile::new(0),
-            max_discard_seg: Volatile::new(0),
-            discard_sector_alignment: Volatile::new(0),
-            max_write_zeroes_sectors: Volatile::new(0),
-            max_write_zeroes_seg: Volatile::new(0),
-            write_zeroes_may_unmap: Volatile::new(0),
-            unused1: [Volatile::new(0); 3],
-            max_secure_erase_sectors: Volatile::new(0),
-            max_secure_erase_seg: Volatile::new(0),
-            secure_erase_sector_alignment: Volatile::new(0),
-            zoned: BlkZonedCharacteristics {
-                zone_sectors: Volatile::new(0),
-                max_open_zones: Volatile::new(0),
-                max_active_zones: Volatile::new(0),
-                max_append_sectors: Volatile::new(0),
-                write_granularity: Volatile::new(0),
-                model: ModelType::NONE,
-                unused2: [Volatile::new(0); 3],
-            },
-        };
-        let state = Arc::new(Mutex::new(State {
-            queues: vec![QueueStatus::default()],
-            ..Default::default()
-        }));
-        let transport = FakeTransport {
-            device_type: DeviceType::Block,
-            max_queue_size: QUEUE_SIZE.into(),
-            device_features: (BlkFeature::RING_INDIRECT_DESC | BlkFeature::FLUSH).bits(),
-            config_space: NonNull::from(&mut config_space),
-            state: state.clone(),
-        };
-        let mut blk = VirtIOBlk::<FakeHal, FakeTransport<BlkConfig>>::new(transport).unwrap();
+        const NUM_REQUESTS: usize = 1000; // 执行的请求数量
 
-        // Start a thread to simulate the device waiting for a flush request.
-        let handle = thread::spawn(move || {
-            println!("Device waiting for a request.");
-            State::wait_until_queue_notified(&state, QUEUE);
-            println!("Transmit queue was notified.");
+        let mut total_execution_time = 0;
 
-            state
-                .lock()
-                .unwrap()
-                .read_write_queue::<{ QUEUE_SIZE as usize }>(QUEUE, |request| {
-                    assert_eq!(
-                        request,
-                        BlkReq {
-                            type_: ReqType::Flush,
-                            reserved: 0,
-                            sector: 0,
-                            // data: [0; 16],
-                            // status: StatusType::OK,
-                        }
-                        .as_bytes()
-                    );
+        for _ in 0..NUM_REQUESTS {
+            let start_time = Instant::now(); // 记录开始时间
+            let mut config_space = BlkConfig {
+                capacity_low: Volatile::new(66),
+                capacity_high: Volatile::new(0),
+                size_max: Volatile::new(0),
+                seg_max: Volatile::new(0),
+                geometry: BlkGeometry {
+                    cylinders: Volatile::new(0),
+                    heads: Volatile::new(0),
+                    sectors: Volatile::new(0),
+                },
+                blk_size: Volatile::new(0),
+                topology: BlkTopology {
+                    physical_block_size: Volatile::new(0),
+                    alignment_offset: Volatile::new(0),
+                    min_io_size: Volatile::new(0),
+                    opt_io_size: Volatile::new(0),
+                },
+                writeback: Volatile::new(0),
+                unused0: Volatile::new(0),
+                num_queues: Volatile::new(0),
+                max_discard_sectors: Volatile::new(0),
+                max_discard_seg: Volatile::new(0),
+                discard_sector_alignment: Volatile::new(0),
+                max_write_zeroes_sectors: Volatile::new(0),
+                max_write_zeroes_seg: Volatile::new(0),
+                write_zeroes_may_unmap: Volatile::new(0),
+                unused1: [Volatile::new(0); 3],
+                max_secure_erase_sectors: Volatile::new(0),
+                max_secure_erase_seg: Volatile::new(0),
+                secure_erase_sector_alignment: Volatile::new(0),
+                zoned: BlkZonedCharacteristics {
+                    zone_sectors: Volatile::new(0),
+                    max_open_zones: Volatile::new(0),
+                    max_active_zones: Volatile::new(0),
+                    max_append_sectors: Volatile::new(0),
+                    write_granularity: Volatile::new(0),
+                    model: ModelType::NONE,
+                    unused2: [Volatile::new(0); 3],
+                },
+            };
+            let state = Arc::new(Mutex::new(State {
+                queues: vec![QueueStatus::default()],
+                ..Default::default()
+            }));
+            let transport = FakeTransport {
+                device_type: DeviceType::Block,
+                max_queue_size: QUEUE_SIZE.into(),
+                device_features: (BlkFeature::RING_INDIRECT_DESC | BlkFeature::FLUSH).bits(),
+                config_space: NonNull::from(&mut config_space),
+                state: state.clone(),
+            };
+            let mut blk = VirtIOBlk::<FakeHal, FakeTransport<BlkConfig>>::new(transport).unwrap();
 
-                    let mut response = Vec::new();
-                    response.extend_from_slice(
-                        BlkResp {
-                            status: RespStatus::OK,
-                        }
-                        .as_bytes(),
-                    );
+            // Start a thread to simulate the device waiting for a flush request.
+            let handle = thread::spawn(move || {
+                println!("Device waiting for a request.");
+                State::wait_until_queue_notified(&state, QUEUE);
+                println!("Transmit queue was notified.");
 
-                    response
-                });
-        });
+                state
+                    .lock()
+                    .unwrap()
+                    .read_write_queue::<{ QUEUE_SIZE as usize }>(QUEUE, |request| {
+                        assert_eq!(
+                            request,
+                            BlkReq {
+                                type_: ReqType::Flush,
+                                reserved: 0,
+                                sector: 0,
+                                // data: [0; 16],
+                                // status: StatusType::OK,
+                            }
+                            .as_bytes()
+                        );
 
-        // Request to flush.
-        blk.flush().unwrap();
+                        let mut response = Vec::new();
+                        response.extend_from_slice(
+                            BlkResp {
+                                status: RespStatus::OK,
+                            }
+                            .as_bytes(),
+                        );
 
-        handle.join().unwrap();
+                        response
+                    });
+            });
+
+            // Request to flush.
+            blk.flush().unwrap();
+
+            handle.join().unwrap();
+            let execution_time = start_time.elapsed().as_micros(); // 计算执行时间
+            total_execution_time += execution_time;
+        }
+        let average_execution_time = total_execution_time as f64 / NUM_REQUESTS as f64;
+        println!(
+            "Average execution time per request: {} microseconds",
+            average_execution_time
+        );
     }
 
     #[test]
     fn device_id() {
-        let mut config_space = BlkConfig {
-            capacity_low: Volatile::new(66),
-            capacity_high: Volatile::new(0),
-            size_max: Volatile::new(0),
-            seg_max: Volatile::new(0),
-            geometry: BlkGeometry {
-                cylinders: Volatile::new(0),
-                heads: Volatile::new(0),
-                sectors: Volatile::new(0),
-            },
-            blk_size: Volatile::new(0),
-            topology: BlkTopology {
-                physical_block_size: Volatile::new(0),
-                alignment_offset: Volatile::new(0),
-                min_io_size: Volatile::new(0),
-                opt_io_size: Volatile::new(0),
-            },
-            writeback: Volatile::new(0),
-            unused0: Volatile::new(0),
-            num_queues: Volatile::new(0),
-            max_discard_sectors: Volatile::new(0),
-            max_discard_seg: Volatile::new(0),
-            discard_sector_alignment: Volatile::new(0),
-            max_write_zeroes_sectors: Volatile::new(0),
-            max_write_zeroes_seg: Volatile::new(0),
-            write_zeroes_may_unmap: Volatile::new(0),
-            unused1: [Volatile::new(0); 3],
-            max_secure_erase_sectors: Volatile::new(0),
-            max_secure_erase_seg: Volatile::new(0),
-            secure_erase_sector_alignment: Volatile::new(0),
-            zoned: BlkZonedCharacteristics {
-                zone_sectors: Volatile::new(0),
-                max_open_zones: Volatile::new(0),
-                max_active_zones: Volatile::new(0),
-                max_append_sectors: Volatile::new(0),
-                write_granularity: Volatile::new(0),
-                model: ModelType::NONE,
-                unused2: [Volatile::new(0); 3],
-            },
-        };
-        let state = Arc::new(Mutex::new(State {
-            queues: vec![QueueStatus::default()],
-            ..Default::default()
-        }));
-        let transport = FakeTransport {
-            device_type: DeviceType::Block,
-            max_queue_size: QUEUE_SIZE.into(),
-            device_features: BlkFeature::RING_INDIRECT_DESC.bits(),
-            config_space: NonNull::from(&mut config_space),
-            state: state.clone(),
-        };
-        let mut blk = VirtIOBlk::<FakeHal, FakeTransport<BlkConfig>>::new(transport).unwrap();
+        const NUM_REQUESTS: usize = 1000; // 执行的请求数量
 
-        // Start a thread to simulate the device waiting for a flush request.
-        let handle = thread::spawn(move || {
-            println!("Device waiting for a request.");
-            State::wait_until_queue_notified(&state, QUEUE);
-            println!("Transmit queue was notified.");
+        let mut total_execution_time = 0;
 
-            state
-                .lock()
-                .unwrap()
-                .read_write_queue::<{ QUEUE_SIZE as usize }>(QUEUE, |request| {
-                    assert_eq!(
-                        request,
-                        BlkReq {
-                            type_: ReqType::GetId,
-                            reserved: 0,
-                            sector: 0,
-                            // data: [0; 16],
-                            // status: StatusType::OK,
-                        }
-                        .as_bytes()
-                    );
+        for _ in 0..NUM_REQUESTS {
+            let start_time = Instant::now(); // 记录开始时间
+            let mut config_space = BlkConfig {
+                capacity_low: Volatile::new(66),
+                capacity_high: Volatile::new(0),
+                size_max: Volatile::new(0),
+                seg_max: Volatile::new(0),
+                geometry: BlkGeometry {
+                    cylinders: Volatile::new(0),
+                    heads: Volatile::new(0),
+                    sectors: Volatile::new(0),
+                },
+                blk_size: Volatile::new(0),
+                topology: BlkTopology {
+                    physical_block_size: Volatile::new(0),
+                    alignment_offset: Volatile::new(0),
+                    min_io_size: Volatile::new(0),
+                    opt_io_size: Volatile::new(0),
+                },
+                writeback: Volatile::new(0),
+                unused0: Volatile::new(0),
+                num_queues: Volatile::new(0),
+                max_discard_sectors: Volatile::new(0),
+                max_discard_seg: Volatile::new(0),
+                discard_sector_alignment: Volatile::new(0),
+                max_write_zeroes_sectors: Volatile::new(0),
+                max_write_zeroes_seg: Volatile::new(0),
+                write_zeroes_may_unmap: Volatile::new(0),
+                unused1: [Volatile::new(0); 3],
+                max_secure_erase_sectors: Volatile::new(0),
+                max_secure_erase_seg: Volatile::new(0),
+                secure_erase_sector_alignment: Volatile::new(0),
+                zoned: BlkZonedCharacteristics {
+                    zone_sectors: Volatile::new(0),
+                    max_open_zones: Volatile::new(0),
+                    max_active_zones: Volatile::new(0),
+                    max_append_sectors: Volatile::new(0),
+                    write_granularity: Volatile::new(0),
+                    model: ModelType::NONE,
+                    unused2: [Volatile::new(0); 3],
+                },
+            };
+            let state = Arc::new(Mutex::new(State {
+                queues: vec![QueueStatus::default()],
+                ..Default::default()
+            }));
+            let transport = FakeTransport {
+                device_type: DeviceType::Block,
+                max_queue_size: QUEUE_SIZE.into(),
+                device_features: BlkFeature::RING_INDIRECT_DESC.bits(),
+                config_space: NonNull::from(&mut config_space),
+                state: state.clone(),
+            };
+            let mut blk = VirtIOBlk::<FakeHal, FakeTransport<BlkConfig>>::new(transport).unwrap();
 
-                    let mut response = Vec::new();
-                    response.extend_from_slice(b"device_id\0\0\0\0\0\0\0\0\0\0\0");
-                    response.extend_from_slice(
-                        BlkResp {
-                            status: RespStatus::OK,
-                        }
-                        .as_bytes(),
-                    );
+            // Start a thread to simulate the device waiting for a flush request.
+            let handle = thread::spawn(move || {
+                println!("Device waiting for a request.");
+                State::wait_until_queue_notified(&state, QUEUE);
+                println!("Transmit queue was notified.");
 
-                    response
-                });
-        });
+                state
+                    .lock()
+                    .unwrap()
+                    .read_write_queue::<{ QUEUE_SIZE as usize }>(QUEUE, |request| {
+                        assert_eq!(
+                            request,
+                            BlkReq {
+                                type_: ReqType::GetId,
+                                reserved: 0,
+                                sector: 0,
+                                // data: [0; 16],
+                                // status: StatusType::OK,
+                            }
+                            .as_bytes()
+                        );
 
-        let mut id = [0; 20];
-        let length = blk.device_id(&mut id).unwrap();
-        assert_eq!(&id[0..length], b"device_id");
+                        let mut response = Vec::new();
+                        response.extend_from_slice(b"device_id\0\0\0\0\0\0\0\0\0\0\0");
+                        response.extend_from_slice(
+                            BlkResp {
+                                status: RespStatus::OK,
+                            }
+                            .as_bytes(),
+                        );
 
-        handle.join().unwrap();
+                        response
+                    });
+            });
+
+            let mut id = [0; 20];
+            let length = blk.device_id(&mut id).unwrap();
+            assert_eq!(&id[0..length], b"device_id");
+
+            handle.join().unwrap();
+            let execution_time = start_time.elapsed().as_micros(); // 计算执行时间
+            total_execution_time += execution_time;
+        }
+        let average_execution_time = total_execution_time as f64 / NUM_REQUESTS as f64;
+        println!(
+            "Average execution time per request: {} microseconds",
+            average_execution_time
+        );
     }
+
+    // #[test]
+    // fn read_async() -> Result<()> {
+    //     let mut config_space = BlkConfig {
+    //         capacity_low: Volatile::new(66),
+    //         capacity_high: Volatile::new(0),
+    //         size_max: Volatile::new(0),
+    //         seg_max: Volatile::new(0),
+    //         geometry: BlkGeometry {
+    //             cylinders: Volatile::new(0),
+    //             heads: Volatile::new(0),
+    //             sectors: Volatile::new(0),
+    //         },
+    //         blk_size: Volatile::new(0),
+    //         topology: BlkTopology {
+    //             physical_block_size: Volatile::new(0),
+    //             alignment_offset: Volatile::new(0),
+    //             min_io_size: Volatile::new(0),
+    //             opt_io_size: Volatile::new(0),
+    //         },
+    //         writeback: Volatile::new(0),
+    //         unused0: Volatile::new(0),
+    //         num_queues: Volatile::new(0),
+    //         max_discard_sectors: Volatile::new(0),
+    //         max_discard_seg: Volatile::new(0),
+    //         discard_sector_alignment: Volatile::new(0),
+    //         max_write_zeroes_sectors: Volatile::new(0),
+    //         max_write_zeroes_seg: Volatile::new(0),
+    //         write_zeroes_may_unmap: Volatile::new(0),
+    //         unused1: [Volatile::new(0); 3],
+    //         max_secure_erase_sectors: Volatile::new(0),
+    //         max_secure_erase_seg: Volatile::new(0),
+    //         secure_erase_sector_alignment: Volatile::new(0),
+    //         zoned: BlkZonedCharacteristics {
+    //             zone_sectors: Volatile::new(0),
+    //             max_open_zones: Volatile::new(0),
+    //             max_active_zones: Volatile::new(0),
+    //             max_append_sectors: Volatile::new(0),
+    //             write_granularity: Volatile::new(0),
+    //             model: ModelType::NONE,
+    //             unused2: [Volatile::new(0); 3],
+    //         },
+    //     };
+    //     let state = Arc::new(Mutex::new(State {
+    //         queues: vec![QueueStatus::default()],
+    //         ..Default::default()
+    //     }));
+    //     let transport = FakeTransport {
+    //         device_type: DeviceType::Block,
+    //         max_queue_size: QUEUE_SIZE.into(),
+    //         device_features: BlkFeature::RING_INDIRECT_DESC.bits(),
+    //         config_space: NonNull::from(&mut config_space),
+    //         state: state.clone(),
+    //     };
+    //     let mut blk = VirtIOBlk::<FakeHal, FakeTransport<BlkConfig>>::new(transport).unwrap();
+
+    //     // Start a thread to simulate the device waiting for a read request.
+    //     let handle = thread::spawn(move || {
+    //         println!("Device waiting for a request.");
+    //         State::wait_until_queue_notified(&state, QUEUE);
+    //         println!("Transmit queue was notified.");
+
+    //         state
+    //             .lock()
+    //             .unwrap()
+    //             .read_write_queue::<{ QUEUE_SIZE as usize }>(QUEUE, |request| {
+    //                 assert_eq!(
+    //                     request,
+    //                     BlkReq {
+    //                         type_: ReqType::In,
+    //                         reserved: 0,
+    //                         sector: 42,
+    //                         // data: [0; 16],
+    //                         // status: StatusType::OK,
+    //                     }
+    //                     .as_bytes()
+    //                 );
+
+    //                 let mut response = vec![0; SECTOR_SIZE];
+    //                 response[0..9].copy_from_slice(b"Test data");
+    //                 response.extend_from_slice(
+    //                     BlkResp {
+    //                         status: RespStatus::OK,
+    //                     }
+    //                     .as_bytes(),
+    //                 );
+
+    //                 response
+    //             });
+    //     });
+
+    //     let mut request = BlkReq {
+    //         type_: ReqType::In,
+    //         reserved: 0,
+    //         sector: 42,
+    //     };
+    //     let mut response = BlkResp {
+    //         status: RespStatus::OK,
+    //     };
+
+    //     let mut buffer = [0; 512];
+    //     let token = unsafe { blk.read_blocks_nb(42, &mut request, &mut buffer, &mut response) }?;
+    //     // assert_eq!(blk.peek_used(), Some(token));
+    //     unsafe {
+    //         blk.complete_read_blocks(token, &request, &mut buffer, &mut response)?;
+    //     }
+    //     // if response.status() == RespStatus::OK {
+    //     //     println!("Successfully read block.");
+    //     // } else {
+    //     //     println!("Error {:?} reading block.", response.status());
+    //     // }
+
+    //     handle.join().unwrap();
+    //     Ok(())
+    // }
 }

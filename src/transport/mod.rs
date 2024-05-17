@@ -160,6 +160,7 @@ pub enum DeviceType {
     Pstore = 22,
     IOMMU = 23,
     Memory = 24,
+    Blk = 25,
 }
 
 impl From<u32> for DeviceType {
